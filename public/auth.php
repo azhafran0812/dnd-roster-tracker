@@ -1,38 +1,87 @@
 <?php
 require 'config.php';
 
+$appUrl = 'https://dnd-roster-tracker.onrender.com/index.php';
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'];
     $email = $_POST['email'];
     $password = $_POST['password'];
 
-    $url = "";
     if ($action === 'register') {
         $url = "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=" . FIREBASE_API_KEY;
+        $data = ['email' => $email, 'password' => $password, 'returnSecureToken' => true];
+        $response = firebase_request($url, 'POST', $data);
+
+        if (isset($response['error'])) {
+            $_SESSION['error'] = str_replace('_', ' ', $response['error']['message']);
+        } else {
+            $idToken = $response['idToken'];
+            $uid = $response['localId'];
+
+            
+            $verifyUrl = "https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=" . FIREBASE_API_KEY;
+            $verifyData = [
+                'requestType' => 'VERIFY_EMAIL',
+                'idToken' => $idToken,
+                'continueUrl' => $appUrl . "/verify.php?uid=" . $uid . "&email=" . urlencode($email)
+            ];
+            firebase_request($verifyUrl, 'POST', $verifyData);
+
+            
+            $dbUrl = FIREBASE_DB_URL . "users/" . $uid . ".json?auth=" . $idToken;
+            $userData = [
+                'email' => $email,
+                'is_verified' => false
+            ];
+            firebase_request($dbUrl, 'PUT', $userData);
+
+            $_SESSION['message'] = "Registration successful! Check your email to verify.";
+        }
     } elseif ($action === 'login') {
         $url = "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" . FIREBASE_API_KEY;
-    }
+        $data = ['email' => $email, 'password' => $password, 'returnSecureToken' => true];
+        $response = firebase_request($url, 'POST', $data);
 
-    $data = [
-        'email' => $email,
-        'password' => $password,
-        'returnSecureToken' => true
-    ];
+        if (isset($response['error'])) {
+            $errMsg = $response['error']['message'];
 
-    $response = firebase_request($url, 'POST', $data);
+            
+            if ($errMsg === 'EMAIL_NOT_FOUND') {
+                $_SESSION['error'] = "Account not found.";
+            } elseif ($errMsg === 'INVALID_PASSWORD' || $errMsg === 'INVALID_LOGIN_CREDENTIALS') {
+                $_SESSION['error'] = "Wrong password.";
+            } else {
+                $_SESSION['error'] = "Error: " . $errMsg;
+            }
+        } else {
+            $idToken = $response['idToken'];
+            $uid = $response['localId'];
 
-    if (isset($response['error'])) {
-        $_SESSION['error'] = str_replace('_', ' ', $response['error']['message']);
-    } else {
-        $_SESSION['idToken'] = $response['idToken'];
-        $_SESSION['localId'] = $response['localId'];
-        $_SESSION['email'] = $response['email'];
-        
-        if ($action === 'register') {
-            $_SESSION['message'] = "Registration successful! Welcome to the realm.";
+            
+            $lookupUrl = "https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=" . FIREBASE_API_KEY;
+            $lookupResponse = firebase_request($lookupUrl, 'POST', ['idToken' => $idToken]);
+
+            $isVerified = false;
+            if (isset($lookupResponse['users'][0]['emailVerified'])) {
+                $isVerified = $lookupResponse['users'][0]['emailVerified'];
+            }
+
+            if ($isVerified) {
+                
+                $dbUrl = FIREBASE_DB_URL . "users/" . $uid . "/is_verified.json?auth=" . $idToken;
+                firebase_request($dbUrl, 'PUT', true);
+
+                $_SESSION['idToken'] = $idToken;
+                $_SESSION['localId'] = $uid;
+                $_SESSION['email'] = $response['email'];
+            } else {
+                
+                $_SESSION['error'] = "Email isn't verified, check your email.";
+            }
         }
     }
-    
+
     header("Location: index.php");
     exit;
 }
