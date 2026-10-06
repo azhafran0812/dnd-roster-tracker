@@ -53,10 +53,13 @@ if ($isLoggedIn) {
                 <div class="card-body">
                     
                     <?php if (isset($_SESSION['error'])): ?>
-                        <div class="text-center mb-3 text-danger fw-bold"><?= $_SESSION['error']; unset($_SESSION['error']); ?></div>
+                        <div class="alert alert-danger text-center fw-bold"><?= $_SESSION['error'];
+                        unset($_SESSION['error']); ?></div>
                     <?php endif; ?>
+                    
                     <?php if (isset($_SESSION['message'])): ?>
-                        <div class="text-center mb-3 text-success fw-bold"><?= $_SESSION['message']; unset($_SESSION['message']); ?></div>
+                        <div class="alert alert-success text-center fw-bold"><?= $_SESSION['message'];
+                        unset($_SESSION['message']); ?></div>
                     <?php endif; ?>
 
                     <form action="auth.php" method="POST">

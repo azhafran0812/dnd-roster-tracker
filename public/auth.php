@@ -48,11 +48,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             
             if ($errMsg === 'EMAIL_NOT_FOUND') {
-                $_SESSION['error'] = "Account not found.";
+                $_SESSION['error'] = "Akun tidak ditemukan di guild.";
             } elseif ($errMsg === 'INVALID_PASSWORD' || $errMsg === 'INVALID_LOGIN_CREDENTIALS') {
-                $_SESSION['error'] = "Wrong password.";
+                $_SESSION['error'] = "Password salah.";
             } else {
-                $_SESSION['error'] = "Error: " . $errMsg;
+                $_SESSION['error'] = "Login Error: " . $errMsg;
             }
         } else {
             $idToken = $response['idToken'];
@@ -69,15 +69,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             if ($isVerified) {
                 
-                $dbUrl = FIREBASE_DB_URL . "users/" . $uid . "/is_verified.json?auth=" . $idToken;
-                firebase_request($dbUrl, 'PUT', true);
+                $dbUrl = FIREBASE_DB_URL . "users/" . $uid . ".json?auth=" . $idToken;
+                firebase_request($dbUrl, 'PATCH', ['is_verified' => true]);
 
+                
                 $_SESSION['idToken'] = $idToken;
                 $_SESSION['localId'] = $uid;
                 $_SESSION['email'] = $response['email'];
             } else {
                 
-                $_SESSION['error'] = "Email isn't verified, check your email.";
+                $_SESSION['error'] = "Email belum diverifikasi. Silakan cek kotak masuk atau folder spam Anda.";
             }
         }
     }
